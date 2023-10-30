@@ -1,10 +1,8 @@
 import fs from "fs";
-import { ProductManager } from '../managers/product.manager.js';
 
 export class CartManager {
   constructor(path) {
     this.path = path;
-    this.productManager = new ProductManager();
   }
 
   async getCarts() {
@@ -15,14 +13,15 @@ export class CartManager {
       } else return [];
     } catch (error) {
       console.log(error);
+      return []
     }
   }
 
   async #getMaxId() {
     let maxId = 0;
     const carts = await this.getCarts();
-    carts.map((prod) => {
-      if (prod.id > maxId) maxId = prod.id;
+    carts.map((cart) => {
+      if (cart.id > maxId) maxId = cart.id;
     });
     return maxId;
   }
@@ -41,63 +40,41 @@ export class CartManager {
       console.log(error);
     }
   }
-  async saveProductToCart(idCart, idProd) {
-    const carts = await this.getCarts();
-    const cartExists = await this.getCartById(idCart);
-    const productExists = await this.productManager.getProductById(idProd);
-
-    if (cartExists) {
-      if (productExists) {
-        // Comprobamos si el producto ya existe en el carrito
-        const existingProduct = cartExists.products.find(p => p.product === idProd);
-
-        if (existingProduct) {
-          existingProduct.quantity += 1;
-        } else {
-          // Si no existe, lo añadimos
-          const prod = {
-            product: idProd, // Usamos 'product' para hacer referencia al producto
-            quantity: 1,
-          };
-          cartExists.products.push(prod);
-        }
-
-        // Guardamos el carrito actualizado
-        await fs.promises.writeFile(this.path, JSON.stringify(carts));
-        return cartExists;
-      } else {
-        console.log(`El producto con ID ${idProd} no existe.`);
-        return null;
-      }
-    } else {
-      console.log(`El carrito con ID ${idCart} no existe.`);
-      return null;
-    }
-  }
-
-
-  async getProductById(id) {
-    try {
-      const product = await this.productManager.getProductById(id);
-      if (product) {
-        return product;
-      } else {
-        console.log(`El producto con ID ${id} no existe.`);
-        return null;
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  }
 
   async getCartById(id) {
     try {
       const carts = await this.getCarts();
       const cart = carts.find(c => c.id === id);
-      if (!cart) return null;
-      return cart;
+      return cart || null;
     } catch (error) {
       console.log(error);
+      return null;
+    }
+  }
+
+  async saveProductToCart(idCart, idProd) {
+    try {
+      const carts = await this.getCarts();
+      const cartIndex = carts.findIndex((cart) => cart.id === idCart);
+      if (cartIndex === -1) return false;
+
+      const cart = carts[cartIndex];
+      const existingProductIndex = cart.products.findIndex(
+        (product) => product.product === idProd
+      );
+
+      if (existingProductIndex !== -1) {
+        cart.products[existingProductIndex].quantity += 1;
+      } else {
+        const newProduct = { product: idProd, quantity: 1 };
+        cart.products.push(newProduct);
+      }
+
+      await fs.promises.writeFile(this.path, JSON.stringify(carts));
+      return true;
+    } catch (error) {
+      console.log(error);
+      return false;
     }
   }
 }
